@@ -38,7 +38,7 @@ const NewsSchema = mongoose.Schema(
 
 // MIDDLEWARE TO count view every find by id
 NewsSchema.post("findOne", async function (news, next) {
-  if (news) {
+  if (news && this.getOptions().incrementViews) {
     news.views += 1;
     await news.save();
     next();

@@ -1,6 +1,41 @@
 import News from "../models/newModel.js";
 import Tags from "../models/tagsModel.js";
 import mongoose from "mongoose";
+import multer from "multer";
+
+// const multerStorage = multer.memoryStorage();
+const multerStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "public/img/news");
+  },
+  filename: (req, file, cb) => {
+    // news-title-time.jpeg
+    console.log(req.body);
+    const title = req.body.title.trim().replace(/\s+/g, " ").toLowerCase();
+    const imgName = title.split("").slice(0, 7).join("").replace(/\s+/g, "");
+    console.log(title);
+    const ext = file.mimetype.split("/")[1];
+    cb(null, `news-${imgName}-${Date.now()}.${ext}`);
+  },
+});
+
+const multerFilter = (req, file, cb) => {
+  // only accepts image file type
+  if (file.mimetype.startsWith("image")) {
+    cb(null, true);
+  } else {
+    const error = new Error("Not an image");
+    error.statusCode = 400;
+    cb(error, false);
+  }
+};
+
+const upload = multer({
+  storage: multerStorage,
+  fileFilter: multerFilter,
+});
+
+export const imageUpload = upload.single("images");
 
 export const getListNews = async (req, res) => {
   try {
@@ -25,7 +60,9 @@ export const getListNews = async (req, res) => {
 
 export const addNews = async (req, res) => {
   try {
-    const { title, description, images, tags } = req.body;
+    console.log(req.file);
+    const images = req.file ? req.file?.filename : null;
+    const { title, description, tags } = req.body;
 
     const parsedTag = tags
       .split("#")
@@ -60,6 +97,8 @@ export const addNews = async (req, res) => {
       doc: populatedNews,
     });
   } catch (error) {
+    console.log("dito nag erro");
+    console.log(error.message);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -69,7 +108,9 @@ export const getNews = async (req, res) => {
     const { id } = req.params;
     console.log(req.params);
     console.log(id);
-    const news = await News.findById(id).populate("tags");
+    const news = await News.findById(id)
+      .populate("tags")
+      .setOptions({ incrementViews: true });
     res.status(200).json({
       success: true,
       doc: news,
@@ -131,6 +172,49 @@ export const filterByTags = async (req, res) => {
   }
 };
 
+// likes and dislikes
+
+export const likeAndDislike = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const oldLikeDis = await News.findById(id);
+
+    console.log(oldLikeDis.likes);
+    console.log(oldLikeDis.dislikes);
+    const { isLike } = req.body;
+    console.log(req.body);
+    console.log(typeof isLike);
+    if (isLike) {
+      const likeDis = await News.findByIdAndUpdate(
+        id,
+        { $inc: { likes: 1 } },
+        {
+          new: true,
+          runValidators: true,
+        }
+      ).setOptions({ incrementViews: false });
+      res
+        .status(200)
+        .json({ success: true, doc: likeDis, message: "Liked successfully" });
+    } else {
+      const likeDis = await News.findByIdAndUpdate(
+        id,
+        { $inc: { dislikes: 1 } },
+        {
+          new: true,
+          runValidators: true,
+        }
+      ).setOptions({ incrementViews: false });
+      res
+        .status(200)
+        .json({ success: true, doc: likeDis, message: "Liked successfully" });
+    }
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// for data upload only
 export const addNewsMany = async (req, res) => {
   try {
     const newsArray = req.body;
