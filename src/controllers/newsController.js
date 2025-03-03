@@ -43,7 +43,6 @@ export const getListNews = async (req, res) => {
     const totalNews = await News.countDocuments();
     const news = await News.find({})
       .populate("tags")
-      .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(parseInt(limit));
     const totalPages = Math.ceil(totalNews / limit);
